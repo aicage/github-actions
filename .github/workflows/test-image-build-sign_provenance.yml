@@ -60,10 +60,6 @@ jobs:
     outputs:
       INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
       INDEX_DIGEST_arm64: ${{ steps.out-arm64.outputs.INDEX_DIGEST }}
-      PLATFORM_DIGEST_amd64: ${{ steps.out-amd64.outputs.PLATFORM_DIGEST }}
-      PLATFORM_DIGEST_arm64: ${{ steps.out-arm64.outputs.PLATFORM_DIGEST }}
-      ATTESTATION_DIGEST_amd64: ${{ steps.out-amd64.outputs.ATTESTATION_DIGEST }}
-      ATTESTATION_DIGEST_arm64: ${{ steps.out-arm64.outputs.ATTESTATION_DIGEST }}
 
     steps:
 
@@ -114,10 +110,31 @@ jobs:
             cat /test.txt
             grep -q 'test-date:' /test.txt
 
+  gather-digests:
+    name: Write digests to variables
+    needs: [set-globals, build]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+          - arch: arm64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+    outputs:
+      PLATFORM_DIGEST_amd64: ${{ steps.out-amd64.outputs.PLATFORM_DIGEST }}
+      PLATFORM_DIGEST_arm64: ${{ steps.out-arm64.outputs.PLATFORM_DIGEST }}
+      ATTESTATION_DIGEST_amd64: ${{ steps.out-amd64.outputs.ATTESTATION_DIGEST }}
+      ATTESTATION_DIGEST_arm64: ${{ steps.out-arm64.outputs.ATTESTATION_DIGEST }}
+
+    steps:
+
       - name: Write digests to env
         run: |
           set -euo pipefail
-          INDEX_DIGEST=${{ steps.build_image.outputs.digest }}
+          INDEX_DIGEST=${{ matrix.INDEX_DIGEST }}
           PLATFORM_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
             | jq -r '.manifests[]
               | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
@@ -127,7 +144,6 @@ jobs:
               | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
               | .digest' | head -n1)"
           (
-            echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_ENV"
@@ -138,7 +154,6 @@ jobs:
         run: |
           set -euo pipefail
           (
-            echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
@@ -149,7 +164,6 @@ jobs:
         run: |
           set -euo pipefail
           (
-            echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
@@ -175,15 +189,15 @@ jobs:
 
   slsa-provenance-PLATFORM_DIGEST:
     name: SLSA provenance index-digest (${{ matrix.arch }})
-    needs: [set-globals, build]
+    needs: [set-globals, gather-digests]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     strategy:
       matrix:
         include:
           - arch: amd64
-            PLATFORM_DIGEST: ${{ needs.build.outputs.PLATFORM_DIGEST_amd64 }}
+            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_amd64 }}
           - arch: arm64
-            PLATFORM_DIGEST: ${{ needs.build.outputs.PLATFORM_DIGEST_arm64 }}
+            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
     with:
       image: ${{ needs.set-globals.outputs.IMAGE_REF }}
       digest: ${{ matrix.PLATFORM_DIGEST }}
@@ -193,7 +207,13 @@ jobs:
 
   cosign-operations:
     name: Cosign signature and validations (${{ matrix.arch }})
-    needs: [set-globals, build, slsa-provenance-INDEX_DIGEST, slsa-provenance-PLATFORM_DIGEST]
+    needs: [
+      set-globals,
+      build,
+      gather-digests,
+      slsa-provenance-INDEX_DIGEST,
+      slsa-provenance-PLATFORM_DIGEST
+    ]
     runs-on: ubuntu-latest
     env:
       IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
@@ -202,12 +222,12 @@ jobs:
         include:
           - arch: amd64
             INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
-            PLATFORM_DIGEST: ${{ needs.build.outputs.PLATFORM_DIGEST_amd64 }}
-            ATTESTATION_DIGEST: ${{ needs.build.outputs.ATTESTATION_DIGEST_amd64 }}
+            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_amd64 }}
+            ATTESTATION_DIGEST: ${{ needs.gather-digests.outputs.ATTESTATION_DIGEST_amd64 }}
           - arch: arm64
             INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
-            PLATFORM_DIGEST: ${{ needs.build.outputs.PLATFORM_DIGEST_arm64 }}
-            ATTESTATION_DIGEST: ${{ needs.build.outputs.ATTESTATION_DIGEST_arm64 }}
+            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
+            ATTESTATION_DIGEST: ${{ needs.gather-digests.outputs.ATTESTATION_DIGEST_arm64 }}
 
     steps:
 
