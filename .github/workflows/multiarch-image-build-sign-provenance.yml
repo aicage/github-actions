@@ -354,7 +354,7 @@ jobs:
             docker buildx imagetools create \
               --dry-run \
               "${INDEX_DIGEST_amd64}" \
-              "${INDEX_DIGEST_arm64}"
+              "${INDEX_DIGEST_arm64}" \
             | \
             regctl manifest put \
               --by-digest \
