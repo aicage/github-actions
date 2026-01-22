@@ -139,11 +139,13 @@ jobs:
       - name: Write image info to env
         run: |
           set -euo pipefail
+          INDEX_DIGEST=${{ matrix.INDEX_DIGEST }}
           PLATFORM_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
             | jq -r '.manifests[]
               | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
               | .digest' | head -n1)"
           {
+            echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
