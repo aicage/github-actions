@@ -28,12 +28,6 @@ name: Build Multi-Arch Image With Signature and Provenance
         required: true
         type: string
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-  actions: read
-
 env:
   IMAGE_REF: ${{ inputs.image_ref }}
   UNIQUE: ${{ inputs.unique }}
@@ -268,6 +262,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish architecture-specific tags
         run: |
           set -euo pipefail
