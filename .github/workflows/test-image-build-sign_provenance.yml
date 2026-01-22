@@ -118,19 +118,19 @@ jobs:
         run: |
           set -euo pipefail
           INDEX_DIGEST=${{ steps.build_image.outputs.digest }}
-          PLATFORM_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
-            | jq -r '.manifests[]
-              | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
-              | .digest' | head -n1)"
-          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${{ matrix.INDEX_DIGEST }}" \
-            | jq -r '.manifests[]
-              | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
-              | .digest' | head -n1)"
-          (
-            echo "INDEX_DIGEST=${INDEX_DIGEST}"
-            echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
-            echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
-          ) | tee /dev/stderr >> "$GITHUB_ENV"
+#          PLATFORM_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
+#            | jq -r '.manifests[]
+#              | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
+#              | .digest' | head -n1)"
+#          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${{ matrix.INDEX_DIGEST }}" \
+#            | jq -r '.manifests[]
+#              | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
+#              | .digest' | head -n1)"
+#          (
+#            echo "INDEX_DIGEST=${INDEX_DIGEST}"
+#            echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
+#            echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
+#          ) | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Export digest (amd64)
         id: out-amd64
