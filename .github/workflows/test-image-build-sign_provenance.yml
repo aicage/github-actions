@@ -11,13 +11,15 @@ permissions:
   actions: read
 
 env:
-  GH_TOKEN: ${{ github.token }}
   IMAGE_REGISTRY: ghcr.io
-  IMAGE_REPOSITORY: ${{ github.repository_owner }}/test-image-sign_provenance
+  IMAGE_REPOSITORY: aicage/test-image-sign_provenance
   VERSION_TAG: version-${{ github.sha }}
   PURPOSE_TAG: latest
+  TEST_TAG_PREFIX: ""
+  TEST_TAG_POSTFIX: -test
   DOCKERFILE: test-image-sign_provenance/Dockerfile
   BUILD_CONTEXT: test-image-sign_provenance/
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
 
@@ -67,7 +69,7 @@ jobs:
           {
             echo "IMAGE_VERSION_TAG=${IMAGE_REF}:${VERSION_TAG}-${{ matrix.arch }}"
             echo "IMAGE_PURPOSE_TAG=${IMAGE_REF}:${PURPOSE_TAG}-${{ matrix.arch }}"
-            echo "IMAGE_TEST_TAG=${IMAGE_REF}:${UNIQUE}-${{ matrix.arch }}-test"
+            echo "IMAGE_TEST_TAG=${IMAGE_REF}:${TEST_TAG_PREFIX}${UNIQUE}-${{ matrix.arch }}${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Checkout
