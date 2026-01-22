@@ -192,7 +192,7 @@ jobs:
 
   slsa_provenance:
     name: "${{ matrix.arch }}: SLSA provenance"
-    needs: [build]
+    needs: [set-globals, build]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     strategy:
       matrix:
@@ -202,7 +202,7 @@ jobs:
           - arch: arm64
             INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
     with:
-      image: ${IMAGE_REGISTRY}/${{ github.repository_owner }}/${IMAGE_REPOSITORY}
+      image: ${{ needs.set-globals.outputs.IMAGE_REF }}
       digest: ${{ matrix.INDEX_DIGEST }}
       registry-username: ${{ github.actor }}
     secrets:
