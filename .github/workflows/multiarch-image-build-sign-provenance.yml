@@ -347,9 +347,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install regctl
+        uses:
+          regclient/actions/regctl-installer@main
+
       - name: Publish test multi-arch manifest
         run: |
           set -euo pipefail
+          # 1) generate the multi-arch index/manifest JSON (no push)
+          # 2) push it *by digest* (no tag needed)
           MANIFEST_DIGEST="$(
             docker buildx imagetools create \
               --dry-run \
