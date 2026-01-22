@@ -187,8 +187,6 @@ jobs:
       # buildx often returns an OCI *index* digest even for single-arch builds.
       # Sign BOTH:
       #   1) the index digest (what the tag resolves to)
-      #   2) the platform manifest digest (so `cosign verify IMAGE@PDIGEST` works)
-
       - name: Sign image index-digest with cosign
         id: sign-INDEX_DIGEST
         continue-on-error: true
@@ -197,6 +195,7 @@ jobs:
 # disabled          test -n "${INDEX_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${INDEX_DIGEST}"
 
+      #   2) the platform manifest digest (so `cosign verify IMAGE@PDIGEST` works)
       - name: Sign image platform-digest with cosign
         id: sign-PLATFORM_DIGEST
         continue-on-error: true
