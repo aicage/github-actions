@@ -120,9 +120,27 @@ jobs:
         if: matrix.arch == 'arm64'
         run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
 
-  cosign-signature:
-    name: Add cosign signature (${{ matrix.arch }})
+  slsa-provenance:
+    name: SLSA provenance (${{ matrix.arch }})
     needs: [set-globals, build]
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+          - arch: arm64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+    with:
+      image: ${{ needs.set-globals.outputs.IMAGE_REF }}
+      digest: ${{ matrix.INDEX_DIGEST }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  cosign-operations:
+    name: Cosign signature and validations (${{ matrix.arch }})
+    needs: [set-globals, build, slsa-provenance]
     runs-on: ubuntu-latest
     env:
       IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
@@ -144,9 +162,14 @@ jobs:
             | jq -r '.manifests[]
               | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
               | .digest' | head -n1)"
+          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${{ matrix.INDEX_DIGEST }}" \
+            | jq -r '.manifests[]
+              | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
+              | .digest' | head -n1)"
           {
             echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
+            echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Log in to Docker Registry
@@ -180,58 +203,15 @@ jobs:
               "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
             "${IMAGE_REF}@${INDEX_DIGEST}"
 
-          # Also verify the platform manifest digest is signed.
+      - name: Verify platform manifest digest signature
+        run: |
+          set -euo pipefail
           test -n "${PLATFORM_DIGEST}"
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             --certificate-identity-regexp \
               "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
             "${IMAGE_REF}@${PLATFORM_DIGEST}"
-
-  slsa-provenance:
-    name: SLSA provenance (${{ matrix.arch }})
-    needs: [set-globals, build]
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
-    strategy:
-      matrix:
-        include:
-          - arch: amd64
-            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
-          - arch: arm64
-            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
-    with:
-      image: ${{ needs.set-globals.outputs.IMAGE_REF }}
-      digest: ${{ matrix.INDEX_DIGEST }}
-      registry-username: ${{ github.actor }}
-    secrets:
-      registry-password: ${{ secrets.GITHUB_TOKEN }}
-
-  verify-provenance:
-    name: Verify provenance (${{ matrix.arch }})
-    needs: [set-globals, build, slsa-provenance]
-    runs-on: ubuntu-latest
-    env:
-      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
-    strategy:
-      matrix:
-        include:
-          - arch: amd64
-            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
-          - arch: arm64
-            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
-
-    steps:
-
-      - name: Write image info to env
-        run: |
-          set -euo pipefail
-          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${{ matrix.INDEX_DIGEST }}" \
-            | jq -r '.manifests[]
-              | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
-              | .digest' | head -n1)"
-          {
-            echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
-          } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Verify provenance is present (and pinned by the signed index)
         run: |
@@ -253,8 +233,10 @@ jobs:
 
   publish-image:
     name: Publish image (${{ matrix.arch }})
-    needs: [set-globals, build, cosign-signature, slsa-provenance, verify-provenance]
+    needs: [set-globals, build, slsa-provenance, cosign-operations]
     runs-on: ubuntu-latest
+    env:
+      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
     strategy:
       matrix:
         include:
@@ -276,7 +258,7 @@ jobs:
           docker buildx imagetools create \
             --tag "${IMAGE_VERSION_TAG}" \
             --tag "${IMAGE_PURPOSE_TAG}" \
-            "${IMAGE_REF}@${INDEX_DIGEST}"
+            "${IMAGE_REF}@${{ matrix.INDEX_DIGEST }}"
 
   manifest:
     name: Publish multi-arch manifest
