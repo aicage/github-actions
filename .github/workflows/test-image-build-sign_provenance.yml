@@ -40,7 +40,7 @@ jobs:
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build, sign, and publish image (${{ matrix.arch }})
+    name: Build and sign image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     needs: set-globals
     strategy:
@@ -229,7 +229,7 @@ jobs:
             --predicate-type https://slsa.dev/provenance/v0.2 \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
-            "{IMAGE_REF}"
+            "${IMAGE_REF}@${INDEX_DIGEST}"
 
   publish-image:
     name: Publish image (${{ matrix.arch }})
