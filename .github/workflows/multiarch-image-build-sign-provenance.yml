@@ -1,4 +1,4 @@
-name: Test Image Building With Signature and Provenance
+name: Build Multi-Arch Image With Signature and Provenance
 
 "on":
   push:
@@ -12,13 +12,13 @@ permissions:
 
 env:
   IMAGE_REGISTRY: ghcr.io
-  IMAGE_REPOSITORY: aicage/test-image-sign_provenance
+  IMAGE_REPOSITORY: aicage/test-multiarch-image-build-sign-provenance
   VERSION_TAG: version-${{ github.sha }}
   PURPOSE_TAG: latest
   TEST_TAG_PREFIX: ""
   TEST_TAG_POSTFIX: -test
-  DOCKERFILE: test-image-sign_provenance/Dockerfile
-  BUILD_CONTEXT: test-image-sign_provenance/
+  DOCKERFILE: tests/build/Dockerfile
+  BUILD_CONTEXT: tests/build/
   GH_TOKEN: ${{ github.token }}
 
 jobs:
