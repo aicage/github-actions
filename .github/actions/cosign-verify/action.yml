@@ -1,0 +1,28 @@
+name: Cosign Verify
+
+description: Verify a container image signature with cosign and OIDC identity constraints.
+
+inputs:
+  image:
+    description: Image reference to verify.
+    required: true
+  certificate_oidc_issuer:
+    description: Expected OIDC issuer.
+    required: false
+    default: https://token.actions.githubusercontent.com
+  certificate_identity_regexp:
+    description: Expected certificate identity regexp.
+    required: false
+    default: "^https://github.com/${{ github.repository }}/.github/workflows/.*@refs/.*/.*$"
+
+runs:
+  using: composite
+  steps:
+    - name: Verify signature
+      shell: bash
+      run: |
+        set -euo pipefail
+        cosign verify \
+          --certificate-oidc-issuer "${{ inputs.certificate_oidc_issuer }}" \
+          --certificate-identity-regexp "${{ inputs.certificate_identity_regexp }}" \
+          "${{ inputs.image }}"
