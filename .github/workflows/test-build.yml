@@ -1,4 +1,4 @@
-name: Build Multi-Arch Image With Signature and Provenance (Caller)
+name: "Test-Build Workflow for: Build Multi-Arch Image With Signature and Provenance"
 
 "on":
   push:
