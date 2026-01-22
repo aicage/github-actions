@@ -39,10 +39,11 @@ env:
   UNIQUE: ${{ inputs.unique }}
   VERSION_TAG: ${{ inputs.version_tag }}
   PURPOSE_TAG: ${{ inputs.purpose_tag }}
+  CERTIFICATE_IDENTITY_REGEXP: "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$"
 
 jobs:
 
-  gather-digests:
+  image-gather-digests:
     name: Write digests to variables
     runs-on: ubuntu-latest
     strategy:
@@ -97,7 +98,7 @@ jobs:
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
-  slsa-provenance-INDEX_DIGEST:
+  image-slsa-provenance-INDEX_DIGEST:
     name: SLSA provenance index-digest (${{ matrix.arch }})
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     strategy:
@@ -115,17 +116,17 @@ jobs:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
 
-  slsa-provenance-PLATFORM_DIGEST:
+  image-slsa-provenance-PLATFORM_DIGEST:
     name: SLSA provenance index-digest (${{ matrix.arch }})
-    needs: [gather-digests]
+    needs: [image-gather-digests]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     strategy:
       matrix:
         include:
           - arch: amd64
-            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_amd64 }}
+            PLATFORM_DIGEST: ${{ needs.image-gather-digests.outputs.PLATFORM_DIGEST_amd64 }}
           - arch: arm64
-            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
+            PLATFORM_DIGEST: ${{ needs.image-gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
     with:
       image: ${{ inputs.image_ref }}
       digest: ${{ matrix.PLATFORM_DIGEST }}
@@ -133,12 +134,12 @@ jobs:
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
-  cosign-verify:
+  image-cosign-verify:
     name: Cosign signature and validations (${{ matrix.arch }})
     needs: [
-      gather-digests,
-      slsa-provenance-INDEX_DIGEST,
-      slsa-provenance-PLATFORM_DIGEST
+      image-gather-digests,
+      image-slsa-provenance-INDEX_DIGEST,
+      image-slsa-provenance-PLATFORM_DIGEST
     ]
     runs-on: ubuntu-latest
     strategy:
@@ -146,24 +147,23 @@ jobs:
         include:
           - arch: amd64
             INDEX_DIGEST: ${{ inputs.index_digest_amd64 }}
-            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_amd64 }}
-            ATTESTATION_DIGEST: ${{ needs.gather-digests.outputs.ATTESTATION_DIGEST_amd64 }}
+            PLATFORM_DIGEST: ${{ needs.image-gather-digests.outputs.PLATFORM_DIGEST_amd64 }}
+            ATTESTATION_DIGEST: ${{ needs.image-gather-digests.outputs.ATTESTATION_DIGEST_amd64 }}
           - arch: arm64
             INDEX_DIGEST: ${{ inputs.index_digest_arm64 }}
-            PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
-            ATTESTATION_DIGEST: ${{ needs.gather-digests.outputs.ATTESTATION_DIGEST_arm64 }}
+            PLATFORM_DIGEST: ${{ needs.image-gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
+            ATTESTATION_DIGEST: ${{ needs.image-gather-digests.outputs.ATTESTATION_DIGEST_arm64 }}
 
     steps:
 
       - name: Write image info to env
         run: |
           set -euo pipefail
-          CERTIFICATE_IDENTITY_REGEXP="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$"
+          
           {
             echo "INDEX_DIGEST=${{ matrix.INDEX_DIGEST }}"
             echo "PLATFORM_DIGEST=${{ matrix.PLATFORM_DIGEST }}"
             echo "ATTESTATION_DIGEST=${{ matrix.ATTESTATION_DIGEST }}"
-            echo "CERTIFICATE_IDENTITY_REGEXP=${CERTIFICATE_IDENTITY_REGEXP}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Log in to Docker Registry
@@ -277,11 +277,9 @@ jobs:
             exit 1
           fi
 
-  publish-image:
+  image-publish:
     name: Publish image (${{ matrix.arch }})
-    needs: [
-      cosign-verify
-    ]
+    needs: image-cosign-verify
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -317,7 +315,7 @@ jobs:
   manifest:
     name: Publish multi-arch manifest
     runs-on: ubuntu-latest
-    needs: [publish-image]
+    needs: image-publish
     env:
       IMAGE_REF: ${{ inputs.image_ref }}
       INDEX_DIGEST_amd64: ${{ inputs.index_digest_amd64 }}
@@ -386,8 +384,7 @@ jobs:
           set -euo pipefail
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp \
-              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
             "${IMAGE_REF}@${MANIFEST_DIGEST}"
 
       - name: Publish final multi-arch manifest tags
