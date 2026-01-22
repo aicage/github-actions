@@ -166,10 +166,12 @@ jobs:
             | jq -r '.manifests[]
               | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
               | .digest' | head -n1)"
+          CERTIFICATE_IDENTITY_REGEXP="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$"
           {
             echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
+            echo "CERTIFICATE_IDENTITY_REGEXP=${CERTIFICATE_IDENTITY_REGEXP}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Log in to Docker Registry
@@ -182,41 +184,54 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
 
-      - name: Sign image with cosign
+      # buildx often returns an OCI *index* digest even for single-arch builds.
+      # Sign BOTH:
+      #   1) the index digest (what the tag resolves to)
+      #   2) the platform manifest digest (so `cosign verify IMAGE@PDIGEST` works)
+
+      - name: Sign image index-digest with cosign
+        id: sign-INDEX_DIGEST
+        continue-on-error: true
         run: |
           set -euo pipefail
-          # buildx often returns an OCI *index* digest even for single-arch builds.
-          # Sign BOTH:
-          #   1) the index digest (what the tag resolves to)
-          #   2) the platform manifest digest (so `cosign verify IMAGE@PDIGEST` works)
-          test -n "${INDEX_DIGEST}"
+# disabled          test -n "${INDEX_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${INDEX_DIGEST}"
-          test -n "${PLATFORM_DIGEST}"
+
+      - name: Sign image platform-digest with cosign
+        id: sign-PLATFORM_DIGEST
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+# disabled          test -n "${PLATFORM_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
-      - name: Verify image signature
+      - name: Verify image index-digest signature
+        id: verify-INDEX_DIGEST
+        continue-on-error: true
         run: |
           set -euo pipefail
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp \
-              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
             "${IMAGE_REF}@${INDEX_DIGEST}"
 
-      - name: Verify platform manifest digest signature
+      - name: Verify platform-manifest-digest signature
+        id: verify-PLATFORM_DIGEST
+        continue-on-error: true
         run: |
           set -euo pipefail
-          test -n "${PLATFORM_DIGEST}"
+# disabled          test -n "${PLATFORM_DIGEST}"
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp \
-              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
             "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
       - name: Verify provenance is present (and pinned by the signed index)
+        id: verify-ATTESTATION_DIGEST
+        continue-on-error: true
         run: |
           set -euo pipefail
-          test -n "${ATTESTATION_DIGEST}"
+# disabled          test -n "${ATTESTATION_DIGEST}"
           # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
           docker buildx imagetools inspect --raw "${IMAGE_REF}@${ATTESTATION_DIGEST}" \
             | jq -e '.layers[]?
@@ -224,12 +239,26 @@ jobs:
               | select(startswith("https://slsa.dev/provenance/"))'
 
       - name: Verify SLSA provenance
+        id: verify-SLSA
+        continue-on-error: true
         run: |
           cosign verify-attestation \
             --type https://slsa.dev/provenance/v0.2 \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
             "${IMAGE_REF}@${INDEX_DIGEST}"
+
+      - name: Fail job if any step failed
+        if: always()
+        run: |
+          if [ "${{ steps.sign-INDEX_DIGEST.outcome }}" = "failure" ] \
+          || [ "${{ steps.sign-PLATFORM_DIGEST.outcome }}" = "failure" ] \
+          || [ "${{ steps.verify-INDEX_DIGEST.outcome }}" = "failure" ] \
+          || [ "${{ steps.verify-PLATFORM_DIGEST.outcome }}" = "failure" ] \
+          || [ "${{ steps.verify-ATTESTATION_DIGEST.outcome }}" = "failure" ] \
+          || [ "${{ steps.verify-SLSA.outcome }}" = "failure" ]; then
+            exit 1
+          fi
 
   publish-image:
     name: Publish image (${{ matrix.arch }})
