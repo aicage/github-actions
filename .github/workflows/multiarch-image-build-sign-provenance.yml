@@ -39,6 +39,7 @@ env:
   UNIQUE: ${{ inputs.unique }}
   VERSION_TAG: ${{ inputs.version_tag }}
   PURPOSE_TAG: ${{ inputs.purpose_tag }}
+  CERTIFICATE_IDENTITY_REGEXP: "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$"
 
 jobs:
 
@@ -158,12 +159,11 @@ jobs:
       - name: Write image info to env
         run: |
           set -euo pipefail
-          CERTIFICATE_IDENTITY_REGEXP="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$"
+          
           {
             echo "INDEX_DIGEST=${{ matrix.INDEX_DIGEST }}"
             echo "PLATFORM_DIGEST=${{ matrix.PLATFORM_DIGEST }}"
             echo "ATTESTATION_DIGEST=${{ matrix.ATTESTATION_DIGEST }}"
-            echo "CERTIFICATE_IDENTITY_REGEXP=${CERTIFICATE_IDENTITY_REGEXP}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Log in to Docker Registry
@@ -384,8 +384,7 @@ jobs:
           set -euo pipefail
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp \
-              "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
             "${IMAGE_REF}@${MANIFEST_DIGEST}"
 
       - name: Publish final multi-arch manifest tags
