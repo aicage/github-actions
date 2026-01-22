@@ -11,14 +11,15 @@ permissions:
   actions: read
 
 env:
-  GH_TOKEN: ${{ github.token }}
   IMAGE_REGISTRY: ghcr.io
-  IMAGE_OWNER: ${{ github.repository_owner }}
-  IMAGE_REPOSITORY: test-image-sign_provenance
+  IMAGE_REPOSITORY: aicage/test-image-sign_provenance
   VERSION_TAG: version-${{ github.sha }}
   PURPOSE_TAG: latest
+  TEST_TAG_PREFIX: ""
+  TEST_TAG_POSTFIX: -test
   DOCKERFILE: test-image-sign_provenance/Dockerfile
   BUILD_CONTEXT: test-image-sign_provenance/
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
 
@@ -34,12 +35,12 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "IMAGE_REF=${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_REPOSITORY}"
+            echo "IMAGE_REF=${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}"
             echo "UNIQUE=${{ github.sha }}-$(uuidgen)"
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
-    name: "${{ matrix.arch }}: Build, sign, and publish image"
+    name: Build, sign, and publish image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     needs: set-globals
     strategy:
@@ -68,7 +69,7 @@ jobs:
           {
             echo "IMAGE_VERSION_TAG=${IMAGE_REF}:${VERSION_TAG}-${{ matrix.arch }}"
             echo "IMAGE_PURPOSE_TAG=${IMAGE_REF}:${PURPOSE_TAG}-${{ matrix.arch }}"
-            echo "IMAGE_TEST_TAG=${IMAGE_REF}:${UNIQUE}-${{ matrix.arch }}-test"
+            echo "IMAGE_TEST_TAG=${IMAGE_REF}:${TEST_TAG_PREFIX}${UNIQUE}-${{ matrix.arch }}${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Checkout
@@ -98,6 +99,19 @@ jobs:
           tags: |
             ${{ env.IMAGE_TEST_TAG }}
 
+      - name: Test image
+        uses: addnab/docker-run-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ env.IMAGE_REF }}@${{ env.INDEX_DIGEST }}
+          run: |
+            set -euo pipefail
+            echo "Debug: cat /test.txt"
+            cat /test.txt
+            grep -q 'test-date:' /test.txt
+
       - name: Write image info to env
         run: |
           set -euo pipefail
@@ -116,19 +130,6 @@ jobs:
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
             # echo "IMAGE_VERSION_ID=${IMAGE_VERSION_ID}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
-
-      - name: Test image
-        uses: addnab/docker-run-action@v3
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ env.IMAGE_REF }}@${{ env.INDEX_DIGEST }}
-          run: |
-            set -euo pipefail
-            echo "Debug: cat /test.txt"
-            cat /test.txt
-            grep -q 'test-date:' /test.txt
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
@@ -191,7 +192,7 @@ jobs:
             "${IMAGE_REF}@${INDEX_DIGEST}"
 
   slsa_provenance:
-    name: "${{ matrix.arch }}: SLSA provenance"
+    name: SLSA provenance (${{ matrix.arch }})
     needs: [set-globals, build]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     strategy:
