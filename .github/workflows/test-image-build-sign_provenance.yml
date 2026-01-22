@@ -39,7 +39,7 @@ jobs:
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
-    name: "${{ matrix.arch }}: Build, sign, and publish image util"
+    name: "${{ matrix.arch }}: Build, sign, and publish image"
     runs-on: ${{ matrix.runner }}
     needs: set-globals
     strategy:
@@ -202,7 +202,7 @@ jobs:
           - arch: arm64
             INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
     with:
-      image: ghcr.io/${{ github.repository_owner }}/aicage-image-util
+      image: ${{ env.IMAGE_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_REPOSITORY }}
       digest: ${{ matrix.INDEX_DIGEST }}
       registry-username: ${{ github.actor }}
     secrets:
