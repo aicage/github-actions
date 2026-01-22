@@ -143,7 +143,7 @@ jobs:
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
-  cosign-operations:
+  cosign-verify:
     name: Cosign signature and validations (${{ matrix.arch }})
     needs: [
       gather-digests,
@@ -290,9 +290,7 @@ jobs:
   publish-image:
     name: Publish image (${{ matrix.arch }})
     needs: [
-      slsa-provenance-INDEX_DIGEST,
-      slsa-provenance-PLATFORM_DIGEST,
-      cosign-operations
+      cosign-verify
     ]
     runs-on: ubuntu-latest
     strategy:
