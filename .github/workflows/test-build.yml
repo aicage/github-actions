@@ -103,17 +103,16 @@ jobs:
             ${{ env.IMAGE_TEST_TAG }}
 
       - name: Test image
-        uses: addnab/docker-run-action@v3
-        with:
-          # registry: ${{ env.IMAGE_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ env.IMAGE_REF }}@${{ steps.build_image.outputs.digest }}
-          run: |
-            set -euo pipefail
-            echo "Debug: cat /test.txt"
-            cat /test.txt
-            grep -q 'test-date:' /test.txt
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            ${{ env.IMAGE_REF }}@${{ steps.build_image.outputs.digest }} \
+            sh -ec '
+              set -eu
+              echo "Debug: cat /test.txt"
+              cat /test.txt
+              grep -q "test-date:" /test.txt
+            '
 
       - name: Export digest (amd64)
         id: out-amd64
