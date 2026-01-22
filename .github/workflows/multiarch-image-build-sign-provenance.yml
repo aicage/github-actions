@@ -358,7 +358,7 @@ jobs:
             | \
             regctl manifest put \
               --by-digest \
-              "$REPO" \
+              "${IMAGE_REF}" \
               --format '{{.Digest}}'
           )"
           {
