@@ -110,6 +110,24 @@ jobs:
             cat /test.txt
             grep -q 'test-date:' /test.txt
 
+      - name: Export digest (amd64)
+        id: out-amd64
+        if: matrix.arch == 'amd64'
+        run: |
+          set -euo pipefail
+          (
+            echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}"
+          ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
+
+      - name: Export digest (arm64)
+        id: out-arm64
+        if: matrix.arch == 'arm64'
+        run: |
+          set -euo pipefail
+          (
+            echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}"
+          ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
+
   gather-digests:
     name: Write digests to variables
     needs: [set-globals, build]
