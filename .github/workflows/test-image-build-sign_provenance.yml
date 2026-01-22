@@ -154,7 +154,7 @@ jobs:
             echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
-  slsa-provenance=INDEX_DIGEST:
+  slsa-provenance-INDEX_DIGEST:
     name: SLSA provenance index-digest (${{ matrix.arch }})
     needs: [set-globals, build]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
@@ -173,7 +173,7 @@ jobs:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
 
-  slsa-provenance=PLATFORM_DIGEST:
+  slsa-provenance-PLATFORM_DIGEST:
     name: SLSA provenance index-digest (${{ matrix.arch }})
     needs: [set-globals, build]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
@@ -193,7 +193,7 @@ jobs:
 
   cosign-operations:
     name: Cosign signature and validations (${{ matrix.arch }})
-    needs: [set-globals, build, slsa-provenance=INDEX_DIGEST, slsa-provenance=PLATFORM_DIGEST]
+    needs: [set-globals, build, slsa-provenance-INDEX_DIGEST, slsa-provenance-PLATFORM_DIGEST]
     runs-on: ubuntu-latest
     env:
       IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
@@ -334,7 +334,7 @@ jobs:
 
   publish-image:
     name: Publish image (${{ matrix.arch }})
-    needs: [set-globals, build, slsa-provenance=INDEX_DIGEST, cosign-operations]
+    needs: [set-globals, build, slsa-provenance-INDEX_DIGEST, slsa-provenance-PLATFORM_DIGEST, cosign-operations]
     runs-on: ubuntu-latest
     env:
       IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
