@@ -1,0 +1,115 @@
+name: Image Cosign Verify
+
+description: Sign and verify image digests and validate SLSA provenance for a single arch.
+
+inputs:
+  image_ref:
+    description: Image reference (registry/repo).
+    required: true
+  index_digest:
+    description: Index digest for the image.
+    required: true
+  platform_digest:
+    description: Platform manifest digest for the image.
+    required: true
+  attestation_digest:
+    description: Attestation manifest digest for the image.
+    required: true
+  source_uri:
+    description: Source repository URI for SLSA verification.
+    required: true
+  registry:
+    description: Registry hostname.
+    required: false
+    default: ghcr.io
+  registry_username:
+    description: Registry username.
+    required: true
+  registry_password:
+    description: Registry password or token.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to Docker Registry
+      uses: docker/login-action@v3.6.0
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.registry_username }}
+        password: ${{ inputs.registry_password }}
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v4.0.0
+
+    # buildx often returns an OCI *index* digest even for single-arch builds.
+    # Sign BOTH:
+    #   1) the index digest (what the tag resolves to)
+    #   2) the platform manifest digest (so `cosign verify IMAGE@PDIGEST` works)
+
+    - name: Sign image index-digest with cosign
+      shell: bash
+      run: |
+        set -euo pipefail
+        cosign sign --yes "${{ inputs.image_ref }}@${{ inputs.index_digest }}"
+
+    - name: Sign image platform-digest with cosign
+      shell: bash
+      run: |
+        set -euo pipefail
+        cosign sign --yes "${{ inputs.image_ref }}@${{ inputs.platform_digest }}"
+
+    - name: Verify image index-digest signature
+      shell: bash
+      run: |
+        set -euo pipefail
+        cosign verify \
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+          --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+          "${{ inputs.image_ref }}@${{ inputs.index_digest }}"
+
+    - name: Verify platform-manifest-digest signature
+      shell: bash
+      run: |
+        set -euo pipefail
+        cosign verify \
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+          --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+          "${{ inputs.image_ref }}@${{ inputs.platform_digest }}"
+
+    - name: Verify provenance is present (and pinned by the signed index)
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
+        docker buildx imagetools inspect --raw "${{ inputs.image_ref }}@${{ inputs.attestation_digest }}" \
+          | jq -e '.layers[]?
+            | .annotations."in-toto.io/predicate-type"
+            | select(startswith("https://slsa.dev/provenance/"))'
+
+    - name: Install slsa-verifier
+      uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
+
+    - name: Verify SLSA provenance of index-digest
+      shell: bash
+      run: |
+        cosign download attestation \
+          "${{ inputs.image_ref }}@${{ inputs.index_digest }}" \
+          > provenance.intoto.jsonl
+        slsa-verifier verify-image \
+          --provenance-path provenance.intoto.jsonl \
+          --source-uri "${{ inputs.source_uri }}" \
+          "${{ inputs.image_ref }}@${{ inputs.index_digest }}"
+        rm provenance.intoto.jsonl
+
+    - name: Verify SLSA provenance of platform-digest
+      shell: bash
+      run: |
+        cosign download attestation \
+          "${{ inputs.image_ref }}@${{ inputs.platform_digest }}" \
+          > provenance.intoto.jsonl
+        slsa-verifier verify-image \
+          --provenance-path provenance.intoto.jsonl \
+          --source-uri "${{ inputs.source_uri }}" \
+          "${{ inputs.image_ref }}@${{ inputs.platform_digest }}"
+        rm provenance.intoto.jsonl

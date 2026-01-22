@@ -148,95 +148,19 @@ jobs:
             ATTESTATION_DIGEST: ${{ needs.image-gather-digests.outputs.ATTESTATION_DIGEST_arm64 }}
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v6.0.1
 
-      - name: Write image info to env
-        run: |
-          set -euo pipefail
-          
-          {
-            echo "INDEX_DIGEST=${{ matrix.INDEX_DIGEST }}"
-            echo "PLATFORM_DIGEST=${{ matrix.PLATFORM_DIGEST }}"
-            echo "ATTESTATION_DIGEST=${{ matrix.ATTESTATION_DIGEST }}"
-          } | tee /dev/stderr >> "$GITHUB_ENV"
-
-      - name: Log in to Docker Registry
-        uses: docker/login-action@v3.6.0
+      - name: Verify and attest image (single-arch)
+        uses: ./.github/actions/image-cosign-verify
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.0.0
-
-      # buildx often returns an OCI *index* digest even for single-arch builds.
-      # Sign BOTH:
-      #   1) the index digest (what the tag resolves to)
-      #   2) the platform manifest digest (so `cosign verify IMAGE@PDIGEST` works)
-
-      - name: Sign image index-digest with cosign
-        id: sign-INDEX_DIGEST
-        run: |
-          set -euo pipefail
-          cosign sign --yes "${IMAGE_REF}@${INDEX_DIGEST}"
-
-      - name: Sign image platform-digest with cosign
-        id: sign-PLATFORM_DIGEST
-        run: |
-          set -euo pipefail
-          cosign sign --yes "${IMAGE_REF}@${PLATFORM_DIGEST}"
-
-      - name: Verify image index-digest signature
-        id: verify-INDEX_DIGEST
-        uses: ./.github/actions/cosign-verify
-        with:
-          image: ${{ env.IMAGE_REF }}@${{ matrix.INDEX_DIGEST }}
-
-      - name: Verify platform-manifest-digest signature
-        id: verify-PLATFORM_DIGEST
-        uses: ./.github/actions/cosign-verify
-        with:
-          image: ${{ env.IMAGE_REF }}@${{ matrix.PLATFORM_DIGEST }}
-
-      - name: Verify provenance is present (and pinned by the signed index)
-        id: verify-ATTESTATION_DIGEST
-        run: |
-          set -euo pipefail
-          # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
-          docker buildx imagetools inspect --raw "${IMAGE_REF}@${ATTESTATION_DIGEST}" \
-            | jq -e '.layers[]?
-              | .annotations."in-toto.io/predicate-type"
-              | select(startswith("https://slsa.dev/provenance/"))'
-
-      - name: Install slsa-verifier
-        uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
-
-      - name: Verify SLSA provenance of index-digest
-        id: verify-SLSA-INDEX_DIGEST
-        run: |
-          cosign download attestation \
-            "${IMAGE_REF}@${INDEX_DIGEST}" \
-            > provenance.intoto.jsonl
-          slsa-verifier verify-image \
-            --provenance-path provenance.intoto.jsonl \
-            --source-uri github.com/${{ github.repository }} \
-            "${IMAGE_REF}@${INDEX_DIGEST}"
-          rm provenance.intoto.jsonl
-
-      - name: Verify SLSA provenance of platform-digest
-        id: verify-SLSA-PLATFORM_DIGEST
-        run: |
-          cosign download attestation \
-            "${IMAGE_REF}@${PLATFORM_DIGEST}" \
-            > provenance.intoto.jsonl
-          slsa-verifier verify-image \
-            --provenance-path provenance.intoto.jsonl \
-            --source-uri github.com/${{ github.repository }} \
-            "${IMAGE_REF}@${PLATFORM_DIGEST}"
-          rm provenance.intoto.jsonl
+          image_ref: ${{ inputs.image_ref }}
+          index_digest: ${{ matrix.INDEX_DIGEST }}
+          platform_digest: ${{ matrix.PLATFORM_DIGEST }}
+          attestation_digest: ${{ matrix.ATTESTATION_DIGEST }}
+          source_uri: github.com/${{ github.repository }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
 
   image-publish:
     name: Publish image (${{ matrix.arch }})
