@@ -27,6 +27,10 @@ jobs:
     outputs:
       IMAGE_REF: ${{ steps.output-vars.outputs.IMAGE_REF }}
       UNIQUE: ${{ steps.output-vars.outputs.UNIQUE }}
+      VERSION_TAG: ${{ steps.output-vars.outputs.VERSION_TAG }}
+      PURPOSE_TAG: ${{ steps.output-vars.outputs.PURPOSE_TAG }}
+      TEST_TAG_PREFIX: ${{ steps.output-vars.outputs.TEST_TAG_PREFIX }}
+      TEST_TAG_POSTFIX: ${{ steps.output-vars.outputs.TEST_TAG_POSTFIX }}
     steps:
       - name: Output global vars
         id: output-vars
@@ -35,6 +39,10 @@ jobs:
           {
             echo "IMAGE_REF=${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}"
             echo "UNIQUE=${{ github.sha }}-$(uuidgen)"
+            echo "VERSION_TAG=${VERSION_TAG}"
+            echo "PURPOSE_TAG=${PURPOSE_TAG}"
+            echo "TEST_TAG_PREFIX=${TEST_TAG_PREFIX}"
+            echo "TEST_TAG_POSTFIX=${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
@@ -132,10 +140,10 @@ jobs:
     with:
       image_ref: ${{ needs.set-globals.outputs.IMAGE_REF }}
       unique: ${{ needs.set-globals.outputs.UNIQUE }}
-      version_tag: ${{ env.VERSION_TAG }}
-      purpose_tag: ${{ env.PURPOSE_TAG }}
-      test_tag_prefix: ${{ env.TEST_TAG_PREFIX }}
-      test_tag_postfix: ${{ env.TEST_TAG_POSTFIX }}
+      version_tag: ${{ needs.set-globals.outputs.VERSION_TAG }}
+      purpose_tag: ${{ needs.set-globals.outputs.PURPOSE_TAG }}
+      test_tag_prefix: ${{ needs.set-globals.outputs.TEST_TAG_PREFIX }}
+      test_tag_postfix: ${{ needs.set-globals.outputs.TEST_TAG_POSTFIX }}
       index_digest_amd64: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
       index_digest_arm64: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
     secrets: inherit
