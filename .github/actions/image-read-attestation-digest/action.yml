@@ -1,0 +1,28 @@
+name: Image Read Attestation Digests
+
+description: Reads attestation-digest from an image
+
+inputs:
+  image:
+    description: Image reference to verify.
+    required: true
+
+outputs:
+  digest:
+    description: Image attestation digest
+    value: ${{ steps.read-digest.outputs.digest }
+
+runs:
+  using: composite
+  steps:
+
+    - name: Read digest
+      id: read-digest
+      run: |
+        set -euo pipefail
+        (
+          echo "digest=$(docker buildx imagetools inspect --raw "${{ inputs.image }}" \
+          | jq -r '.manifests[]
+            | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
+            | .digest' | head -n1)"
+        ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
