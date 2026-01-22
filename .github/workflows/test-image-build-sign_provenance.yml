@@ -194,7 +194,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-# disabled          test -n "${INDEX_DIGEST}"
+          # disabled
+          # test -n "${INDEX_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${INDEX_DIGEST}"
 
       - name: Sign image platform-digest with cosign
@@ -202,7 +203,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-# disabled          test -n "${PLATFORM_DIGEST}"
+          # disabled
+          # test -n "${PLATFORM_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
       - name: Verify image index-digest signature
