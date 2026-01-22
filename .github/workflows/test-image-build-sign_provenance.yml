@@ -122,7 +122,7 @@ jobs:
             | jq -r '.manifests[]
               | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
               | .digest' | head -n1)"
-          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${{ matrix.INDEX_DIGEST }}" \
+          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
             | jq -r '.manifests[]
               | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
               | .digest' | head -n1)"
