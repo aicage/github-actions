@@ -13,8 +13,7 @@ permissions:
 env:
   GH_TOKEN: ${{ github.token }}
   IMAGE_REGISTRY: ghcr.io
-  IMAGE_OWNER: ${{ github.repository_owner }}
-  IMAGE_REPOSITORY: test-image-sign_provenance
+  IMAGE_REPOSITORY: ${{ github.repository_owner }}/test-image-sign_provenance
   VERSION_TAG: version-${{ github.sha }}
   PURPOSE_TAG: latest
   DOCKERFILE: test-image-sign_provenance/Dockerfile
@@ -34,12 +33,12 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "IMAGE_REF=${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_REPOSITORY}"
+            echo "IMAGE_REF=${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}"
             echo "UNIQUE=${{ github.sha }}-$(uuidgen)"
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
-    name: "${{ matrix.arch }}: Build, sign, and publish image"
+    name: Build, sign, and publish image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     needs: set-globals
     strategy:
@@ -191,7 +190,7 @@ jobs:
             "${IMAGE_REF}@${INDEX_DIGEST}"
 
   slsa_provenance:
-    name: "${{ matrix.arch }}: SLSA provenance"
+    name: SLSA provenance (${{ matrix.arch }})
     needs: [set-globals, build]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     strategy:
