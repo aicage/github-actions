@@ -141,8 +141,6 @@ jobs:
       unique: ${{ needs.set-globals.outputs.UNIQUE }}
       version_tag: ${{ needs.set-globals.outputs.VERSION_TAG }}
       purpose_tag: ${{ needs.set-globals.outputs.PURPOSE_TAG }}
-      test_tag_prefix: ${{ needs.set-globals.outputs.TEST_TAG_PREFIX }}
-      test_tag_postfix: ${{ needs.set-globals.outputs.TEST_TAG_POSTFIX }}
       index_digest_amd64: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
       index_digest_arm64: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
     secrets: inherit
