@@ -222,7 +222,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-# disabled          test -n "${PLATFORM_DIGEST}"
+          # disabled
+          # test -n "${PLATFORM_DIGEST}"
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
@@ -233,7 +234,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-# disabled          test -n "${ATTESTATION_DIGEST}"
+          # disabled
+          # test -n "${ATTESTATION_DIGEST}"
           # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
           docker buildx imagetools inspect --raw "${IMAGE_REF}@${ATTESTATION_DIGEST}" \
             | jq -e '.layers[]?
