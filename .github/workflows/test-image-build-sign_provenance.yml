@@ -290,25 +290,44 @@ jobs:
               | .annotations."in-toto.io/predicate-type"
               | select(startswith("https://slsa.dev/provenance/"))'
 
+      - name: Install slsa-verifier
+        uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
+
       - name: Verify SLSA provenance of index-digest
         id: verify-SLSA-INDEX_DIGEST
         continue-on-error: true
         run: |
-          cosign verify-attestation \
-            --type https://slsa.dev/provenance/v0.2 \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
+          cosign download attestation \
+            "${IMAGE_REF}@${INDEX_DIGEST}" \
+            > provenance.intoto.jsonl
+          slsa-verifier verify-image \
+            --provenance-path provenance.intoto.jsonl \
+            --source-uri github.com/${{ github.repository }} \
             "${IMAGE_REF}@${INDEX_DIGEST}"
+          rm provenance.intoto.jsonl
+#          cosign verify-attestation \
+#            --type https://slsa.dev/provenance/v0.2 \
+#            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
+#            "${IMAGE_REF}@${INDEX_DIGEST}"
 
       - name: Verify SLSA provenance of platform-digest
         id: verify-SLSA-PLATFORM_DIGEST
         continue-on-error: true
         run: |
-          cosign verify-attestation \
-            --type https://slsa.dev/provenance/v0.2 \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
+          cosign download attestation \
+            "${IMAGE_REF}@${PLATFORM_DIGEST}" \
+            > provenance.intoto.jsonl
+          slsa-verifier verify-image \
+            --provenance-path provenance.intoto.jsonl \
+            --source-uri github.com/${{ github.repository }} \
             "${IMAGE_REF}@${PLATFORM_DIGEST}"
+          rm provenance.intoto.jsonl
+#          cosign verify-attestation \
+#            --type https://slsa.dev/provenance/v0.2 \
+#            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
+#            "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
       - name: Fail job if any step failed
         if: always()
