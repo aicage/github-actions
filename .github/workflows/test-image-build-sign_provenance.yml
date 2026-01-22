@@ -261,6 +261,14 @@ jobs:
           || [ "${{ steps.verify-PLATFORM_DIGEST.outcome }}" = "failure" ] \
           || [ "${{ steps.verify-ATTESTATION_DIGEST.outcome }}" = "failure" ] \
           || [ "${{ steps.verify-SLSA.outcome }}" = "failure" ]; then
+            
+            echo "steps.sign-INDEX_DIGEST.outcome=${{ steps.sign-INDEX_DIGEST.outcome }}"
+            echo "steps.sign-PLATFORM_DIGEST.outcome=${{ steps.sign-PLATFORM_DIGEST.outcome }}"
+            echo "steps.verify-INDEX_DIGEST.outcome=${{ steps.verify-INDEX_DIGEST.outcome }}"
+            echo "steps.verify-PLATFORM_DIGEST.outcome=${{ steps.verify-PLATFORM_DIGEST.outcome }}"
+            echo "steps.verify-ATTESTATION_DIGEST.outcome=${{ steps.verify-ATTESTATION_DIGEST.outcome }}"
+            echo "steps.verify-SLSA.outcome=${{ steps.verify-SLSA.outcome }}"
+            
             exit 1
           fi
 
