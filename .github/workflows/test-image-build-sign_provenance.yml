@@ -207,9 +207,11 @@ jobs:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   verify-provenance:
-    name: Add signature and provenance (${{ matrix.arch }})
+    name: Verify provenance (${{ matrix.arch }})
     needs: [set-globals, build]
     runs-on: ubuntu-latest
+    env:
+      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
     strategy:
       matrix:
         include:
