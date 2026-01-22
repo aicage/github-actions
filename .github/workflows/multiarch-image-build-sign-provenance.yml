@@ -351,13 +351,11 @@ jobs:
         run: |
           set -euo pipefail
           MANIFEST_DIGEST="$(
-            # 1) generate the multi-arch index/manifest JSON (no push)
             docker buildx imagetools create \
               --dry-run \
               "${INDEX_DIGEST_amd64}" \
               "${INDEX_DIGEST_arm64}"
             | \
-            # 2) push it *by digest* (no tag needed)
             regctl manifest put \
               --by-digest \
               "$REPO" \
