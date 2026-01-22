@@ -243,6 +243,14 @@ jobs:
               | .annotations."in-toto.io/predicate-type"
               | select(startswith("https://slsa.dev/provenance/"))'
 
+      - name: Verify SLSA provenance
+        run: |
+          cosign verify-attestation \
+            --predicate-type https://slsa.dev/provenance/v0.2 \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+            "{IMAGE_REF}"
+
   publish-image:
     name: Publish image (${{ matrix.arch }})
     needs: [set-globals, build, cosign-signature, slsa-provenance, verify-provenance]
