@@ -208,7 +208,7 @@ jobs:
 
   verify-provenance:
     name: Verify provenance (${{ matrix.arch }})
-    needs: [set-globals, build]
+    needs: [set-globals, build, slsa-provenance]
     runs-on: ubuntu-latest
     env:
       IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
