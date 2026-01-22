@@ -242,8 +242,8 @@ jobs:
               | .annotations."in-toto.io/predicate-type"
               | select(startswith("https://slsa.dev/provenance/"))'
 
-      - name: Verify SLSA provenance
-        id: verify-SLSA
+      - name: Verify SLSA provenance of index-digest
+        id: verify-SLSA-INDEX_DIGEST
         continue-on-error: true
         run: |
           cosign verify-attestation \
@@ -251,6 +251,16 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
             "${IMAGE_REF}@${INDEX_DIGEST}"
+
+      - name: Verify SLSA provenance of platform-digest
+        id: verify-SLSA-PLATFORM_DIGEST
+        continue-on-error: true
+        run: |
+          cosign verify-attestation \
+            --type https://slsa.dev/provenance/v0.2 \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
+            "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
       - name: Fail job if any step failed
         if: always()
@@ -260,14 +270,16 @@ jobs:
           || [ "${{ steps.verify-INDEX_DIGEST.outcome }}" = "failure" ] \
           || [ "${{ steps.verify-PLATFORM_DIGEST.outcome }}" = "failure" ] \
           || [ "${{ steps.verify-ATTESTATION_DIGEST.outcome }}" = "failure" ] \
-          || [ "${{ steps.verify-SLSA.outcome }}" = "failure" ]; then
+          || [ "${{ steps.verify-SLSA-INDEX_DIGEST.outcome }}" = "failure" ] \
+          || [ "${{ steps.verify-SLSA-PLATFORM_DIGEST.outcome }}" = "failure" ]; then
             
             echo "steps.sign-INDEX_DIGEST.outcome=${{ steps.sign-INDEX_DIGEST.outcome }}"
             echo "steps.sign-PLATFORM_DIGEST.outcome=${{ steps.sign-PLATFORM_DIGEST.outcome }}"
             echo "steps.verify-INDEX_DIGEST.outcome=${{ steps.verify-INDEX_DIGEST.outcome }}"
             echo "steps.verify-PLATFORM_DIGEST.outcome=${{ steps.verify-PLATFORM_DIGEST.outcome }}"
             echo "steps.verify-ATTESTATION_DIGEST.outcome=${{ steps.verify-ATTESTATION_DIGEST.outcome }}"
-            echo "steps.verify-SLSA.outcome=${{ steps.verify-SLSA.outcome }}"
+            echo "steps.verify-SLSA-INDEX_DIGEST.outcome=${{ steps.verify-SLSA-INDEX_DIGEST.outcome }}"
+            echo "steps.verify-SLSA-PLATFORM_DIGEST.outcome=${{ steps.verify-SLSA-INDEX_DIGEST.outcome }}"
             
             exit 1
           fi
