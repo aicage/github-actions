@@ -366,7 +366,7 @@ jobs:
             regctl manifest put \
               --by-digest \
               "${IMAGE_REF}" \
-              --format '{{.Digest}}'
+              --format '{{.Descriptor.Digest}}'
           )"
           {
             echo "MANIFEST_DIGEST=${MANIFEST_DIGEST}"
