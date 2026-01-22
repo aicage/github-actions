@@ -85,7 +85,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build test image
+      - name: Build image
         id: build_image
         uses: docker/build-push-action@v6
         with:
@@ -280,8 +280,6 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          # disabled
-          # test -n "${INDEX_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${INDEX_DIGEST}"
 
       - name: Sign image platform-digest with cosign
@@ -289,8 +287,6 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          # disabled
-          # test -n "${PLATFORM_DIGEST}"
           cosign sign --yes "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
       - name: Verify image index-digest signature
@@ -308,8 +304,6 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          # disabled
-          # test -n "${PLATFORM_DIGEST}"
           cosign verify \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
@@ -320,8 +314,6 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          # disabled
-          # test -n "${ATTESTATION_DIGEST}"
           # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
           docker buildx imagetools inspect --raw "${IMAGE_REF}@${ATTESTATION_DIGEST}" \
             | jq -e '.layers[]?
@@ -440,7 +432,7 @@ jobs:
           {
             echo "MANIFEST_VERSION_TAG=${IMAGE_REF}:${VERSION_TAG}"
             echo "MANIFEST_PURPOSE_TAG=${IMAGE_REF}:${PURPOSE_TAG}"
-            echo "MANIFEST_TEST_TAG=${IMAGE_REF}:${UNIQUE}-test"
+            echo "MANIFEST_TEST_TAG=${IMAGE_REF}:${TEST_TAG_PREFIX}${UNIQUE}${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Checkout
