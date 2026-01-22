@@ -19,14 +19,6 @@ name: Build Multi-Arch Image With Signature and Provenance
         description: Purpose tag to publish.
         required: true
         type: string
-      test_tag_prefix:
-        description: Prefix for test tags.
-        required: true
-        type: string
-      test_tag_postfix:
-        description: Postfix for test tags.
-        required: true
-        type: string
       index_digest_amd64:
         description: Index digest for amd64 build.
         required: true
@@ -47,8 +39,6 @@ env:
   UNIQUE: ${{ inputs.unique }}
   VERSION_TAG: ${{ inputs.version_tag }}
   PURPOSE_TAG: ${{ inputs.purpose_tag }}
-  TEST_TAG_PREFIX: ${{ inputs.test_tag_prefix }}
-  TEST_TAG_POSTFIX: ${{ inputs.test_tag_postfix }}
 
 jobs:
 
@@ -340,7 +330,6 @@ jobs:
           {
             echo "MANIFEST_VERSION_TAG=${IMAGE_REF}:${VERSION_TAG}"
             echo "MANIFEST_PURPOSE_TAG=${IMAGE_REF}:${PURPOSE_TAG}"
-            echo "MANIFEST_TEST_TAG=${IMAGE_REF}:${TEST_TAG_PREFIX}${UNIQUE}${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Checkout
@@ -361,10 +350,22 @@ jobs:
       - name: Publish test multi-arch manifest
         run: |
           set -euo pipefail
-          docker buildx imagetools create \
-            --tag "${MANIFEST_TEST_TAG}" \
-            "${INDEX_DIGEST_amd64}" \
-            "${INDEX_DIGEST_arm64}"
+          MANIFEST_DIGEST="$(
+            # 1) generate the multi-arch index/manifest JSON (no push)
+            docker buildx imagetools create \
+              --dry-run \
+              "${INDEX_DIGEST_amd64}" \
+              "${INDEX_DIGEST_arm64}"
+            | \
+            # 2) push it *by digest* (no tag needed)
+            regctl manifest put \
+              --by-digest \
+              "$REPO" \
+              --format '{{.Digest}}'
+          )"
+          {
+            echo "MANIFEST_DIGEST=${MANIFEST_DIGEST}"
+          } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
@@ -373,7 +374,7 @@ jobs:
         run: |
           set -euo pipefail
           cosign sign --yes \
-            "${MANIFEST_TEST_TAG}"
+            "${IMAGE_REF}@${MANIFEST_DIGEST}"
 
       - name: Verify multi-arch manifest signature
         run: |
@@ -382,7 +383,7 @@ jobs:
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             --certificate-identity-regexp \
               "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
-            "${MANIFEST_TEST_TAG}"
+            "${IMAGE_REF}@${MANIFEST_DIGEST}"
 
       - name: Publish final multi-arch manifest tags
         run: |
@@ -390,4 +391,4 @@ jobs:
           docker buildx imagetools create \
             --tag "${MANIFEST_VERSION_TAG}" \
             --tag "${MANIFEST_PURPOSE_TAG}" \
-            "${MANIFEST_TEST_TAG}"
+            "${IMAGE_REF}@${MANIFEST_DIGEST}"
