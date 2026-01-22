@@ -1,0 +1,31 @@
+name: Image Read Platform Digest
+
+description: Reads platform-digest from an image
+
+inputs:
+  image:
+    description: Image reference to verify.
+    required: true
+  architecture:
+    description: Platform architecture to verify.
+    required: true
+
+outputs:
+  digest:
+    description: Image platform digest
+    value: ${{ steps.read-digest.outputs.digest }
+
+runs:
+  using: composite
+  steps:
+
+    - name: Read digest
+      id: read-digest
+      run: |
+        set -euo pipefail
+        (
+          echo "digest=$(docker buildx imagetools inspect --raw "${{ inputs.image }}" \
+            | jq -r '.manifests[]
+              | select(.platform.os=="linux" and .platform.architecture=="${{ inputs.architecture }}")
+              | .digest' | head -n1)"
+        ) | tee /dev/stderr >> "$GITHUB_OUTPUT"

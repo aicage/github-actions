@@ -1,0 +1,48 @@
+name: Publish Manifest Digest
+
+description: Publish multi-arch manifest by digest.
+
+inputs:
+  image_ref:
+    description: Image reference (registry/repo).
+    required: true
+  index_digest_amd64:
+    description: Index digest for the amd64 image.
+    required: true
+  index_digest_arm64:
+    description: Index digest for the arm64 image.
+    required: true
+
+outputs:
+  digest:
+    description: Manifest digest
+    value: ${{ steps.publish-manifest.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+
+    - name: Install regctl
+      uses: regclient/actions/regctl-installer@main
+
+    - name: Publish multi-arch manifest by digest
+      id: publish-manifest
+      shell: bash
+      run: |
+        set -euo pipefail
+        # 1) generate the multi-arch index/manifest JSON (no push)
+        # 2) push it *by digest* (no tag needed)
+        digest="$(
+          docker buildx imagetools create \
+            --dry-run \
+            "${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}" \
+            "${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}" \
+          | \
+          regctl manifest put \
+            --by-digest \
+            "${{ inputs.image_ref }}" \
+            --format '{{ ( .Manifest.GetDescriptor ).Digest }}'
+        )"
+        {
+          echo "digest=${digest}"
+        } | tee /dev/stderr >> "$GITHUB_OUTPUT"

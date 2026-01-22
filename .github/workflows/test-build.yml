@@ -15,8 +15,6 @@ env:
   IMAGE_REPOSITORY: aicage/test-multiarch-image-build-sign-provenance
   VERSION_TAG: version-${{ github.sha }}
   PURPOSE_TAG: latest
-  TEST_TAG_PREFIX: ""
-  TEST_TAG_POSTFIX: -test
   DOCKERFILE: tests/build/Dockerfile
   BUILD_CONTEXT: tests/build/
 
@@ -29,8 +27,6 @@ jobs:
       UNIQUE: ${{ steps.output-vars.outputs.UNIQUE }}
       VERSION_TAG: ${{ steps.output-vars.outputs.VERSION_TAG }}
       PURPOSE_TAG: ${{ steps.output-vars.outputs.PURPOSE_TAG }}
-      TEST_TAG_PREFIX: ${{ steps.output-vars.outputs.TEST_TAG_PREFIX }}
-      TEST_TAG_POSTFIX: ${{ steps.output-vars.outputs.TEST_TAG_POSTFIX }}
     steps:
       - name: Output global vars
         id: output-vars
@@ -41,8 +37,6 @@ jobs:
             echo "UNIQUE=${{ github.sha }}-$(uuidgen)"
             echo "VERSION_TAG=${VERSION_TAG}"
             echo "PURPOSE_TAG=${PURPOSE_TAG}"
-            echo "TEST_TAG_PREFIX=${TEST_TAG_PREFIX}"
-            echo "TEST_TAG_POSTFIX=${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
@@ -61,7 +55,6 @@ jobs:
     env:
       ARCH_SUFFIX: ${{ matrix.arch }}
       PLATFORM: ${{ matrix.platform }}
-      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
       UNIQUE: ${{ needs.set-globals.outputs.UNIQUE }}
     outputs:
       INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
@@ -72,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "IMAGE_TEST_TAG=${IMAGE_REF}:${TEST_TAG_PREFIX}${UNIQUE}-${{ matrix.arch }}${TEST_TAG_POSTFIX}"
+            echo "IMAGE_TEST_TAG=${IMAGE_REF}:${UNIQUE}-${{ matrix.arch }}-test"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Checkout
@@ -100,7 +93,7 @@ jobs:
           provenance: true
           platforms: ${{ env.PLATFORM }}
           tags: |
-            ${{ env.IMAGE_TEST_TAG }}
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ env.UNIQUE }}-${{ matrix.arch }}-test
 
       - name: Test image
         run: |
@@ -138,7 +131,6 @@ jobs:
     uses: ./.github/workflows/multiarch-image-build-sign-provenance.yml
     with:
       image_ref: ${{ needs.set-globals.outputs.IMAGE_REF }}
-      unique: ${{ needs.set-globals.outputs.UNIQUE }}
       version_tag: ${{ needs.set-globals.outputs.VERSION_TAG }}
       purpose_tag: ${{ needs.set-globals.outputs.PURPOSE_TAG }}
       index_digest_amd64: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
