@@ -67,8 +67,6 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "IMAGE_VERSION_TAG=${IMAGE_REF}:${VERSION_TAG}-${{ matrix.arch }}"
-            echo "IMAGE_PURPOSE_TAG=${IMAGE_REF}:${PURPOSE_TAG}-${{ matrix.arch }}"
             echo "IMAGE_TEST_TAG=${IMAGE_REF}:${TEST_TAG_PREFIX}${UNIQUE}-${{ matrix.arch }}${TEST_TAG_POSTFIX}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
@@ -105,30 +103,46 @@ jobs:
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ env.IMAGE_REF }}@${{ env.INDEX_DIGEST }}
+          image: ${{ env.IMAGE_REF }}@${{ steps.build_image.outputs.digest }}
           run: |
             set -euo pipefail
             echo "Debug: cat /test.txt"
             cat /test.txt
             grep -q 'test-date:' /test.txt
 
+      - name: Export digest (amd64)
+        id: out-amd64
+        if: matrix.arch == 'amd64'
+        run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+      - name: Export digest (arm64)
+        id: out-arm64
+        if: matrix.arch == 'arm64'
+        run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+  cosign-signature:
+    name: Add cosign signature (${{ matrix.arch }})
+    needs: [set-globals, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+          - arch: arm64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+
+    steps:
+
       - name: Write image info to env
         run: |
           set -euo pipefail
-          INDEX_DIGEST="${{ steps.build_image.outputs.digest }}"
           PLATFORM_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
             | jq -r '.manifests[]
               | select(.platform.os=="linux" and .platform.architecture=="${{ matrix.arch }}")
               | .digest' | head -n1)"
-          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
-            | jq -r '.manifests[]
-              | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
-              | .digest' | head -n1)"
           {
-            echo "INDEX_DIGEST=${INDEX_DIGEST}"
             echo "PLATFORM_DIGEST=${PLATFORM_DIGEST}"
-            echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
-            # echo "IMAGE_VERSION_ID=${IMAGE_VERSION_ID}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
 
       - name: Install Cosign
@@ -163,35 +177,7 @@ jobs:
               "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
             "${IMAGE_REF}@${PLATFORM_DIGEST}"
 
-      - name: Verify provenance is present (and pinned by the signed index)
-        run: |
-          set -euo pipefail
-          test -n "${ATTESTATION_DIGEST}"
-          # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
-          docker buildx imagetools inspect --raw "${IMAGE_REF}@${ATTESTATION_DIGEST}" \
-            | jq -e '.layers[]?
-              | .annotations."in-toto.io/predicate-type"
-              | select(startswith("https://slsa.dev/provenance/"))'
-
-      - name: Export digest (amd64)
-        id: out-amd64
-        if: matrix.arch == 'amd64'
-        run: echo "INDEX_DIGEST=${INDEX_DIGEST}" >> "$GITHUB_OUTPUT"
-
-      - name: Export digest (arm64)
-        id: out-arm64
-        if: matrix.arch == 'arm64'
-        run: echo "INDEX_DIGEST=${INDEX_DIGEST}" >> "$GITHUB_OUTPUT"
-
-      - name: Publish architecture-specific tags
-        run: |
-          set -euo pipefail
-          docker buildx imagetools create \
-            --tag "${IMAGE_VERSION_TAG}" \
-            --tag "${IMAGE_PURPOSE_TAG}" \
-            "${IMAGE_REF}@${INDEX_DIGEST}"
-
-  slsa_provenance:
+  slsa-provenance:
     name: SLSA provenance (${{ matrix.arch }})
     needs: [set-globals, build]
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
@@ -209,10 +195,72 @@ jobs:
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
+  verify-provenance:
+    name: Add signature and provenance (${{ matrix.arch }})
+    needs: [set-globals, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+          - arch: arm64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+
+    steps:
+
+      - name: Write image info to env
+        run: |
+          set -euo pipefail
+          ATTESTATION_DIGEST="$(docker buildx imagetools inspect --raw "${IMAGE_REF}@${INDEX_DIGEST}" \
+            | jq -r '.manifests[]
+              | select(.annotations."vnd.docker.reference.type"=="attestation-manifest")
+              | .digest' | head -n1)"
+          {
+            echo "ATTESTATION_DIGEST=${ATTESTATION_DIGEST}"
+          } | tee /dev/stderr >> "$GITHUB_ENV"
+
+      - name: Verify provenance is present (and pinned by the signed index)
+        run: |
+          set -euo pipefail
+          test -n "${ATTESTATION_DIGEST}"
+          # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
+          docker buildx imagetools inspect --raw "${IMAGE_REF}@${ATTESTATION_DIGEST}" \
+            | jq -e '.layers[]?
+              | .annotations."in-toto.io/predicate-type"
+              | select(startswith("https://slsa.dev/provenance/"))'
+
+  publish-image:
+    name: Publish image (${{ matrix.arch }})
+    needs: [set-globals, build, cosign-signature, slsa-provenance, verify-provenance]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+          - arch: arm64
+            INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+    steps:
+      - name: Write image tags to env
+        run: |
+          set -euo pipefail
+          {
+            echo "IMAGE_VERSION_TAG=${IMAGE_REF}:${VERSION_TAG}-${{ matrix.arch }}"
+            echo "IMAGE_PURPOSE_TAG=${IMAGE_REF}:${PURPOSE_TAG}-${{ matrix.arch }}"
+          } | tee /dev/stderr >> "$GITHUB_ENV"
+      - name: Publish architecture-specific tags
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "${IMAGE_VERSION_TAG}" \
+            --tag "${IMAGE_PURPOSE_TAG}" \
+            "${IMAGE_REF}@${INDEX_DIGEST}"
+
   manifest:
     name: Publish multi-arch manifest
     runs-on: ubuntu-latest
-    needs: [set-globals, build]
+    needs: [set-globals, build, publish-image]
     env:
       IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
       UNIQUE: ${{ needs.set-globals.outputs.UNIQUE }}
