@@ -124,6 +124,8 @@ jobs:
     name: Add cosign signature (${{ matrix.arch }})
     needs: [set-globals, build]
     runs-on: ubuntu-latest
+    env:
+      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
     strategy:
       matrix:
         include:
