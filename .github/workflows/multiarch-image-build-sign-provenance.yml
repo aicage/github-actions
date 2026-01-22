@@ -39,7 +39,6 @@ env:
   UNIQUE: ${{ inputs.unique }}
   VERSION_TAG: ${{ inputs.version_tag }}
   PURPOSE_TAG: ${{ inputs.purpose_tag }}
-  CERTIFICATE_IDENTITY_REGEXP: "^https://github.com/${{ github.repository }}/.github/workflows/.*@refs/.*/.*$"
 
 jobs:
 
@@ -195,21 +194,15 @@ jobs:
 
       - name: Verify image index-digest signature
         id: verify-INDEX_DIGEST
-        run: |
-          set -euo pipefail
-          cosign verify \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
-            "${IMAGE_REF}@${INDEX_DIGEST}"
+        uses: ./.github/actions/cosign-verify
+        with:
+          image: ${{ env.IMAGE_REF }}@${{ matrix.INDEX_DIGEST }}
 
       - name: Verify platform-manifest-digest signature
         id: verify-PLATFORM_DIGEST
-        run: |
-          set -euo pipefail
-          cosign verify \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
-            "${IMAGE_REF}@${PLATFORM_DIGEST}"
+        uses: ./.github/actions/cosign-verify
+        with:
+          image: ${{ env.IMAGE_REF }}@${{ matrix.PLATFORM_DIGEST }}
 
       - name: Verify provenance is present (and pinned by the signed index)
         id: verify-ATTESTATION_DIGEST
@@ -322,6 +315,7 @@ jobs:
           regclient/actions/regctl-installer@main
 
       - name: Publish test multi-arch manifest
+        id: publish-test-manifest
         run: |
           set -euo pipefail
           # 1) generate the multi-arch index/manifest JSON (no push)
@@ -340,6 +334,9 @@ jobs:
           {
             echo "MANIFEST_DIGEST=${MANIFEST_DIGEST}"
           } | tee /dev/stderr >> "$GITHUB_ENV"
+          {
+            echo "MANIFEST_DIGEST=${MANIFEST_DIGEST}"
+          } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
@@ -351,12 +348,9 @@ jobs:
             "${IMAGE_REF}@${MANIFEST_DIGEST}"
 
       - name: Verify multi-arch manifest signature
-        run: |
-          set -euo pipefail
-          cosign verify \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp "${CERTIFICATE_IDENTITY_REGEXP}" \
-            "${IMAGE_REF}@${MANIFEST_DIGEST}"
+        uses: ./.github/actions/cosign-verify
+        with:
+          image: ${{ env.IMAGE_REF }}@${{ steps.publish-test-manifest.outputs.MANIFEST_DIGEST }}
 
       - name: Publish final multi-arch manifest tags
         run: |
