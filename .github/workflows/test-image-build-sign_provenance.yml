@@ -202,7 +202,7 @@ jobs:
           - arch: arm64
             INDEX_DIGEST: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
     with:
-      image: ${{ env.IMAGE_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_REPOSITORY }}
+      image: ${IMAGE_REGISTRY}/${{ github.repository_owner }}/${IMAGE_REPOSITORY}
       digest: ${{ matrix.INDEX_DIGEST }}
       registry-username: ${{ github.actor }}
     secrets:
