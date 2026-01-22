@@ -118,7 +118,7 @@ jobs:
           - arch: arm64
             INDEX_DIGEST: ${{ inputs.index_digest_arm64 }}
     with:
-      image: ${{ env.IMAGE_REF }}
+      image: ${{ inputs.image_ref }}
       digest: ${{ matrix.INDEX_DIGEST }}
       registry-username: ${{ github.actor }}
     secrets:
@@ -137,7 +137,7 @@ jobs:
           - arch: arm64
             PLATFORM_DIGEST: ${{ needs.gather-digests.outputs.PLATFORM_DIGEST_arm64 }}
     with:
-      image: ${{ env.IMAGE_REF }}
+      image: ${{ inputs.image_ref }}
       digest: ${{ matrix.PLATFORM_DIGEST }}
       registry-username: ${{ github.actor }}
     secrets:
