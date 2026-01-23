@@ -1,7 +1,7 @@
 name: "Test-Build Workflow for: Build Multi-Arch Image With Signature and Provenance"
 
 "on":
-  push:
+  workflow_call: {}
   workflow_dispatch: {}
 
 permissions:
