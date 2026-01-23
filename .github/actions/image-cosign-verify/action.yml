@@ -71,6 +71,13 @@ runs:
     - name: Install slsa-verifier
       uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
 
+    - name: Debug slsa cache permissions
+      shell: bash
+      run: |
+        set -euo pipefail
+        ls -ld /home/runner/.slsa /home/runner/.slsa/bin 2>/dev/null || true
+        stat -c '%U:%G %a %n' /home/runner/.slsa /home/runner/.slsa/bin 2>/dev/null || true
+
     - name: Verify SLSA provenance of index-digest
       shell: bash
       run: |
@@ -82,6 +89,13 @@ runs:
           --source-uri "github.com/${{ github.repository }}" \
           "${{ inputs.image_ref }}@${{ inputs.index_digest }}"
         rm provenance.intoto.jsonl
+
+    - name: Debug slsa cache permissions
+      shell: bash
+      run: |
+        set -euo pipefail
+        ls -ld /home/runner/.slsa /home/runner/.slsa/bin 2>/dev/null || true
+        stat -c '%U:%G %a %n' /home/runner/.slsa /home/runner/.slsa/bin 2>/dev/null || true
 
     - name: Verify SLSA provenance of platform-digest
       shell: bash
