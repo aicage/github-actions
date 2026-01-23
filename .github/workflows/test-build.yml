@@ -55,6 +55,7 @@ jobs:
     env:
       ARCH_SUFFIX: ${{ matrix.arch }}
       PLATFORM: ${{ matrix.platform }}
+      IMAGE_REF: ${{ needs.set-globals.outputs.IMAGE_REF }}
       UNIQUE: ${{ needs.set-globals.outputs.UNIQUE }}
     outputs:
       INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
