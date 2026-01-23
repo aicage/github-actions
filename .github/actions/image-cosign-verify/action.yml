@@ -54,7 +54,7 @@ runs:
 
     - name: Read image attestation digest
       id: read-attestation-digest
-      uses: ./.github/actions/image-read-attestation-digest
+      uses: ./.github-actions/.github/actions/image-read-attestation-digest
       with:
         image: ${{ inputs.image_ref }}@${{ inputs.index_digest }}
 

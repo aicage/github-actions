@@ -40,7 +40,7 @@ jobs:
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build and sign image (${{ matrix.arch }})
+    name: Build image with provenance (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     needs: set-globals
     strategy:
@@ -136,4 +136,5 @@ jobs:
       purpose_tag: ${{ needs.set-globals.outputs.PURPOSE_TAG }}
       index_digest_amd64: ${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
       index_digest_arm64: ${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+      actions_ref: ${{ github.ref }}
     secrets: inherit
