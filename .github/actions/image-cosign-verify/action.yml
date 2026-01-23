@@ -63,7 +63,8 @@ runs:
       run: |
         set -euo pipefail
         # Must contain an in-toto layer declaring a SLSA provenance predicate-type.
-        docker buildx imagetools inspect --raw "${{ inputs.image_ref }}@${{ steps.read-attestation-digest.outputs.digest }}" \
+        docker buildx imagetools inspect \
+          --raw "${{ inputs.image_ref }}@${{ steps.read-attestation-digest.outputs.digest }}" \
           | jq -e '.layers[]?
             | .annotations."in-toto.io/predicate-type"
             | select(startswith("https://slsa.dev/provenance/"))'
