@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           {
             echo "IMAGE_REF=${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}"
-            echo "UNIQUE=${{ github.sha }}-$(uuidgen)"
+            echo "UNIQUE=${GITHUB_SHA::7}-$(uuidgen)"
             echo "VERSION_TAG=${VERSION_TAG}"
             echo "PURPOSE_TAG=${PURPOSE_TAG}"
           } | tee /dev/stderr >> "$GITHUB_OUTPUT"
