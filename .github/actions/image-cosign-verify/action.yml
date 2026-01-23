@@ -68,9 +68,6 @@ runs:
             | .annotations."in-toto.io/predicate-type"
             | select(startswith("https://slsa.dev/provenance/"))'
 
-    - name: Install slsa-verifier
-      uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
-
     - name: Verify SLSA provenance of index-digest
       shell: bash
       run: |

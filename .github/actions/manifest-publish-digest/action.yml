@@ -22,9 +22,6 @@ runs:
   using: composite
   steps:
 
-    - name: Install regctl
-      uses: regclient/actions/regctl-installer@main
-
     - name: Publish multi-arch manifest by digest
       id: publish-manifest
       shell: bash

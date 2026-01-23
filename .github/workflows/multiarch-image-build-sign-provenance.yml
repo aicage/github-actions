@@ -35,17 +35,22 @@ jobs:
 
     steps:
 
+      - name: Checkout
+        uses: actions/checkout@v6.0.1
+
       - name: Read image platform digest (amd64)
         id: platform-digest-amd64
         uses: ./.github/actions/image-read-platform-digest
         with:
           image: ${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}
+          architecture: amd64
 
       - name: Read image platform digest (arm64)
         id: platform-digest-arm64
         uses: ./.github/actions/image-read-platform-digest
         with:
           image: ${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}
+          architecture: arm64
 
   image-slsa-provenance-index_digest:
     name: SLSA provenance index-digest (${{ matrix.arch }})
@@ -84,7 +89,7 @@ jobs:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   verify-publish:
-    name: Cosign signature and validations
+    name: Verify and publish
     needs: [
       image-platform-digests,
       image-slsa-provenance-index_digest,
@@ -106,6 +111,12 @@ jobs:
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
+
+      - name: Install slsa-verifier
+        uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
+
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
 
       - name: Verify and attest image (amd64)
         uses: ./.github/actions/image-cosign-verify

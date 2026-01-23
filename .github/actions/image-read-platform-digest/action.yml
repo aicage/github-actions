@@ -13,7 +13,7 @@ inputs:
 outputs:
   digest:
     description: Image platform digest
-    value: ${{ steps.read-digest.outputs.digest }
+    value: ${{ steps.read-digest.outputs.digest }}
 
 runs:
   using: composite
@@ -21,6 +21,7 @@ runs:
 
     - name: Read digest
       id: read-digest
+      shell: bash
       run: |
         set -euo pipefail
         (
