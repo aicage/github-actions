@@ -1,4 +1,4 @@
-name: "Test: Build Multi-Arch Image With Signature and Provenance"
+name: "Test: Build Multi-Arch Image With Signature and Provenance SLSA"
 
 "on":
   workflow_call: {}
@@ -129,7 +129,7 @@ jobs:
   multiarch:
     name: Run multi-arch sign/provenance/publish
     needs: [set-globals, build]
-    uses: ./.github/workflows/multiarch-image-build-sign-provenance.yml
+    uses: ./.github/workflows/multiarch-image-build-sign-provenance-SLSA.yml
     with:
       image_ref: ${{ needs.set-globals.outputs.IMAGE_REF }}
       version_tag: ${{ needs.set-globals.outputs.VERSION_TAG }}

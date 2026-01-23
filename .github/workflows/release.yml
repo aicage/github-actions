@@ -44,9 +44,18 @@ jobs:
     uses: ./.github/workflows/test-build.yml
     secrets: inherit
 
+  test-build-SLSA:
+    name: "Test: Run test build workflow"
+    uses: ./.github/workflows/test-build-SLSA.yml
+    secrets: inherit
+
   release:
     name: Publish release
-    needs: test-build
+    needs: [
+      lint,
+      test-build,
+      test-build-SLSA
+    ]
     runs-on: ubuntu-latest
     steps:
 

@@ -1,4 +1,4 @@
-name: Build Multi-Arch Image With Signature and Provenance
+name: Build Multi-Arch Image With Signature and Provenance SLSA
 
 "on":
   workflow_call:
@@ -30,8 +30,79 @@ name: Build Multi-Arch Image With Signature and Provenance
 
 jobs:
 
+  image-platform-digests:
+    name: Read image platform digests
+    runs-on: ubuntu-latest
+    outputs:
+      platform_digest_amd64: ${{ steps.platform-digest-amd64.outputs.digest }}
+      platform_digest_arm64: ${{ steps.platform-digest-arm64.outputs.digest }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v6.0.1
+        with:
+          repository: aicage/github-actions
+          ref: ${{ inputs.actions_ref }}
+          path: .github-actions
+
+      - name: Read image platform digest (amd64)
+        id: platform-digest-amd64
+        uses: ./.github-actions/.github/actions/image-read-platform-digest
+        with:
+          image: ${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}
+          architecture: amd64
+
+      - name: Read image platform digest (arm64)
+        id: platform-digest-arm64
+        uses: ./.github-actions/.github/actions/image-read-platform-digest
+        with:
+          image: ${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}
+          architecture: arm64
+
+  image-slsa-provenance-index_digest:
+    name: SLSA provenance index-digest (${{ matrix.arch }})
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            index_digest: ${{ inputs.index_digest_amd64 }}
+          - arch: arm64
+            index_digest: ${{ inputs.index_digest_arm64 }}
+    with:
+      image: ${{ inputs.image_ref }}
+      digest: ${{ matrix.index_digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+
+  image-slsa-provenance-platform_digest:
+    name: SLSA provenance index-digest (${{ matrix.arch }})
+    needs: [image-platform-digests]
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform_digest: ${{ needs.image-platform-digests.outputs.platform_digest_amd64 }}
+          - arch: arm64
+            platform_digest: ${{ needs.image-platform-digests.outputs.platform_digest_arm64 }}
+    with:
+      image: ${{ inputs.image_ref }}
+      digest: ${{ matrix.platform_digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
   verify-publish:
     name: Verify and publish
+    needs: [
+      image-platform-digests,
+      image-slsa-provenance-index_digest,
+      image-slsa-provenance-platform_digest
+    ]
     runs-on: ubuntu-latest
 
     steps:
@@ -53,36 +124,39 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
 
+      - name: Install slsa-verifier
+        uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
+
       - name: Install regctl
         uses: regclient/actions/regctl-installer@main
-
-      - name: Read image platform digest (amd64)
-        id: platform-digest-amd64
-        uses: ./.github-actions/.github/actions/image-read-platform-digest
-        with:
-          image: ${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}
-          architecture: amd64
-
-      - name: Read image platform digest (arm64)
-        id: platform-digest-arm64
-        uses: ./.github-actions/.github/actions/image-read-platform-digest
-        with:
-          image: ${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}
-          architecture: arm64
 
       - name: Verify and attest image (amd64)
         uses: ./.github-actions/.github/actions/image-cosign-verify
         with:
           image_ref: ${{ inputs.image_ref }}
           index_digest: ${{ inputs.index_digest_amd64 }}
-          platform_digest: ${{ steps.platform-digest-amd64.outputs.digest }}
+          platform_digest: ${{ needs.image-platform-digests.outputs.platform_digest_amd64 }}
 
       - name: Verify and attest image (arm64)
         uses: ./.github-actions/.github/actions/image-cosign-verify
         with:
           image_ref: ${{ inputs.image_ref }}
           index_digest: ${{ inputs.index_digest_arm64 }}
-          platform_digest: ${{ steps.platform-digest-arm64.outputs.digest }}
+          platform_digest: ${{ needs.image-platform-digests.outputs.platform_digest_arm64 }}
+
+      - name: Verify SLSA provenance (amd64)
+        uses: ./.github-actions/.github/actions/image-cosign-verify-SLSA
+        with:
+          image_ref: ${{ inputs.image_ref }}
+          index_digest: ${{ inputs.index_digest_amd64 }}
+          platform_digest: ${{ needs.image-platform-digests.outputs.platform_digest_amd64 }}
+
+      - name: Verify SLSA provenance (arm64)
+        uses: ./.github-actions/.github/actions/image-cosign-verify-SLSA
+        with:
+          image_ref: ${{ inputs.image_ref }}
+          index_digest: ${{ inputs.index_digest_arm64 }}
+          platform_digest: ${{ needs.image-platform-digests.outputs.platform_digest_arm64 }}
 
       - name: Publish architecture-specific tags (amd64)
         run: |
