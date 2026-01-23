@@ -21,6 +21,7 @@ runs:
 
     - name: Read digest
       id: read-digest
+      shell: bash
       run: |
         set -euo pipefail
         (
