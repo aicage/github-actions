@@ -12,6 +12,10 @@ inputs:
   platform_digest:
     description: Platform manifest digest for the image.
     required: true
+  certificate_identity_regexp:
+    description: Expected certificate identity regexp.
+    required: false
+    default: "^https://github.com/aicage/github-actions/.github/workflows/.*@refs/.*/.*$"
 
 runs:
   using: composite
@@ -40,7 +44,7 @@ runs:
         set -euo pipefail
         cosign verify \
           --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-          --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+          --certificate-identity-regexp "${{ inputs.certificate_identity_regexp }}" \
           "${{ inputs.image_ref }}@${{ inputs.index_digest }}"
 
     - name: Verify platform-manifest-digest signature
@@ -49,7 +53,7 @@ runs:
         set -euo pipefail
         cosign verify \
           --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-          --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*@refs/.*/.*$" \
+          --certificate-identity-regexp "${{ inputs.certificate_identity_regexp }}" \
           "${{ inputs.image_ref }}@${{ inputs.platform_digest }}"
 
     - name: Read image attestation digest

@@ -13,7 +13,7 @@ inputs:
   certificate_identity_regexp:
     description: Expected certificate identity regexp.
     required: false
-    default: "^https://github.com/${{ github.repository }}/.github/workflows/.*@refs/.*/.*$"
+    default: "^https://github.com/aicage/github-actions/.github/workflows/.*@refs/.*/.*$"
 
 runs:
   using: composite
