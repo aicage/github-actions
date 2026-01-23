@@ -43,12 +43,14 @@ jobs:
         uses: ./.github/actions/image-read-platform-digest
         with:
           image: ${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}
+          architecture: amd64
 
       - name: Read image platform digest (arm64)
         id: platform-digest-arm64
         uses: ./.github/actions/image-read-platform-digest
         with:
           image: ${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}
+          architecture: arm64
 
   image-slsa-provenance-index_digest:
     name: SLSA provenance index-digest (${{ matrix.arch }})
@@ -87,7 +89,7 @@ jobs:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   verify-publish:
-    name: Cosign signature and validations
+    name: Verify and publish
     needs: [
       image-platform-digests,
       image-slsa-provenance-index_digest,
