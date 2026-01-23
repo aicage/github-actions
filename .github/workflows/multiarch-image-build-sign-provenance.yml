@@ -112,6 +112,9 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v4.0.0
 
+      - name: Install slsa-verifier
+        uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
+
       - name: Verify and attest image (amd64)
         uses: ./.github/actions/image-cosign-verify
         with:
