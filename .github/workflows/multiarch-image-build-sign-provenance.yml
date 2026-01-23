@@ -115,6 +115,9 @@ jobs:
       - name: Install slsa-verifier
         uses: slsa-framework/slsa-verifier/actions/installer@v2.7.1
 
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
+
       - name: Verify and attest image (amd64)
         uses: ./.github/actions/image-cosign-verify
         with:
