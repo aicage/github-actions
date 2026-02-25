@@ -1,0 +1,66 @@
+name: GHCR Cleanup
+
+"on":
+  workflow_call:
+    inputs:
+      owner:
+        description: GitHub owner/user/org of the package
+        required: true
+        type: string
+      repository:
+        description: GitHub repository linked to the package
+        required: true
+        type: string
+      package:
+        description: GHCR package name
+        required: true
+        type: string
+      older_than_days:
+        description: Only images older than this many days are eligible for cleanup
+        required: true
+        type: number
+      keep_tags_regex:
+        description: Regex for tags to keep
+        required: true
+        type: string
+      dry_run:
+        description: Simulate cleanup without deleting
+        required: false
+        default: false
+        type: boolean
+      log_level:
+        description: Action log level (error/warn/info/debug)
+        required: false
+        default: info
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ghcr-cleanup:
+    name: GHCR cleanup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cleanup candidate images
+        uses: dataaxiom/ghcr-cleanup-action@v1.0.16
+        with:
+          token: ${{ secrets.GHCR_CLEANUP_PAT != '' && secrets.GHCR_CLEANUP_PAT || github.token }}
+
+          owner: ${{ inputs.owner }}
+          repository: ${{ inputs.repository }}
+          package: ${{ inputs.package }}
+
+          # OR retention:
+          # - keep tags matching keep_tags_regex (and related manifests/referrers)
+          # - keep images newer than older_than_days by only processing older images
+          use-regex: true
+          delete-tags: '.*'
+          exclude-tags: ${{ inputs.keep_tags_regex }}
+          older-than: ${{ inputs.older_than_days }} days
+          delete-untagged: true
+
+          dry-run: ${{ inputs.dry_run }}
+          log-level: ${{ inputs.log_level }}
