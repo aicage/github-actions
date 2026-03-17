@@ -1,0 +1,22 @@
+name: Change Validation
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  test-build:
+    name: "Test: Run test build workflow"
+    uses: ./.github/workflows/test-build.yml
+    secrets: inherit
+
+  test-build-SLSA:
+    name: "Test: Run test build SLSA workflow"
+    uses: ./.github/workflows/test-build-SLSA.yml
+    secrets: inherit
