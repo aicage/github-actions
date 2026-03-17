@@ -15,7 +15,7 @@ inputs:
   certificate_identity_regexp:
     description: Expected certificate identity regexp.
     required: false
-    default: "^https://github.com/aicage/github-actions/.github/workflows/.*@refs/.*/.*$"
+    default: "^https://github.com/aicage/github-actions/.github/workflows/.*@(?:refs/.*/.*|[0-9a-f]{40})$"
 
 runs:
   using: composite
