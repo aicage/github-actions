@@ -1,0 +1,118 @@
+name: Build Multi-Arch Image With Signature and Provenance
+
+description: >
+  Verify, publish, sign, and validate a multi-arch image from pre-built
+  amd64 and arm64 digests in the caller workflow context.
+
+inputs:
+  image_ref:
+    description: Full image reference (registry/repo).
+    required: true
+  version_tag:
+    description: Version tag to publish.
+    required: true
+  purpose_tag:
+    description: Purpose tag to publish.
+    required: true
+  index_digest_amd64:
+    description: Index digest for amd64 build.
+    required: true
+  index_digest_arm64:
+    description: Index digest for arm64 build.
+    required: true
+
+outputs:
+  manifest_digest:
+    description: Published multi-arch manifest digest.
+    value: ${{ steps.publish-manifest.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to Docker Registry
+      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
+
+    - name: Install regctl
+      uses: regclient/actions/regctl-installer@9f6c88d6bc9e9d8416282b1f88be43758b0d066a  # main
+
+    - name: Read image platform digest (amd64)
+      id: platform-digest-amd64
+      uses: ../image-read-platform-digest
+      with:
+        image: ${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}
+        architecture: amd64
+
+    - name: Read image platform digest (arm64)
+      id: platform-digest-arm64
+      uses: ../image-read-platform-digest
+      with:
+        image: ${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}
+        architecture: arm64
+
+    - name: Verify and attest image (amd64)
+      uses: ../image-cosign-verify
+      with:
+        image_ref: ${{ inputs.image_ref }}
+        index_digest: ${{ inputs.index_digest_amd64 }}
+        platform_digest: ${{ steps.platform-digest-amd64.outputs.digest }}
+
+    - name: Verify and attest image (arm64)
+      uses: ../image-cosign-verify
+      with:
+        image_ref: ${{ inputs.image_ref }}
+        index_digest: ${{ inputs.index_digest_arm64 }}
+        platform_digest: ${{ steps.platform-digest-arm64.outputs.digest }}
+
+    - name: Publish architecture-specific tags (amd64)
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker buildx imagetools create \
+          --tag "${{ inputs.image_ref }}:${{ inputs.version_tag }}-amd64" \
+          --tag "${{ inputs.image_ref }}:${{ inputs.purpose_tag }}-amd64" \
+          "${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}"
+
+    - name: Publish architecture-specific tags (arm64)
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker buildx imagetools create \
+          --tag "${{ inputs.image_ref }}:${{ inputs.version_tag }}-arm64" \
+          --tag "${{ inputs.image_ref }}:${{ inputs.purpose_tag }}-arm64" \
+          "${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}"
+
+    - name: Publish multi-arch manifest by digest
+      id: publish-manifest
+      uses: ../manifest-publish-digest
+      with:
+        image_ref: ${{ inputs.image_ref }}
+        index_digest_amd64: ${{ inputs.index_digest_amd64 }}
+        index_digest_arm64: ${{ inputs.index_digest_arm64 }}
+
+    - name: Sign multi-arch manifest digest
+      shell: bash
+      run: |
+        set -euo pipefail
+        cosign sign --yes \
+          "${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}"
+
+    - name: Verify multi-arch manifest signature
+      uses: ../cosign-verify
+      with:
+        image: ${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}
+
+    - name: Publish final multi-arch manifest tags
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker buildx imagetools create \
+          --tag "${{ inputs.image_ref }}:${{ inputs.version_tag }}" \
+          --tag "${{ inputs.image_ref }}:${{ inputs.purpose_tag }}" \
+          "${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}"
