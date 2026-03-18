@@ -44,27 +44,27 @@ runs:
 
     - name: Read image platform digest (amd64)
       id: platform-digest-amd64
-      uses: ../image-read-platform-digest
+      uses: ./.github/actions/image-read-platform-digest
       with:
         image: ${{ inputs.image_ref }}@${{ inputs.index_digest_amd64 }}
         architecture: amd64
 
     - name: Read image platform digest (arm64)
       id: platform-digest-arm64
-      uses: ../image-read-platform-digest
+      uses: ./.github/actions/image-read-platform-digest
       with:
         image: ${{ inputs.image_ref }}@${{ inputs.index_digest_arm64 }}
         architecture: arm64
 
     - name: Verify and attest image (amd64)
-      uses: ../image-cosign-verify
+      uses: ./.github/actions/image-cosign-verify
       with:
         image_ref: ${{ inputs.image_ref }}
         index_digest: ${{ inputs.index_digest_amd64 }}
         platform_digest: ${{ steps.platform-digest-amd64.outputs.digest }}
 
     - name: Verify and attest image (arm64)
-      uses: ../image-cosign-verify
+      uses: ./.github/actions/image-cosign-verify
       with:
         image_ref: ${{ inputs.image_ref }}
         index_digest: ${{ inputs.index_digest_arm64 }}
@@ -90,7 +90,7 @@ runs:
 
     - name: Publish multi-arch manifest by digest
       id: publish-manifest
-      uses: ../manifest-publish-digest
+      uses: ./.github/actions/manifest-publish-digest
       with:
         image_ref: ${{ inputs.image_ref }}
         index_digest_amd64: ${{ inputs.index_digest_amd64 }}
@@ -104,7 +104,7 @@ runs:
           "${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}"
 
     - name: Verify multi-arch manifest signature
-      uses: ../cosign-verify
+      uses: ./.github/actions/cosign-verify
       with:
         image: ${{ inputs.image_ref }}@${{ steps.publish-manifest.outputs.digest }}
 
