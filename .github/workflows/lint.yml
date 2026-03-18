@@ -31,4 +31,4 @@ jobs:
       - name: "Test: Run linters (yamllint, ruff, pymarkdown)"
         run: |
           yamllint .
-          pymarkdown --config .pymarkdown.json scan --recurse --exclude './.venv/' .
+          pymarkdown --config .pymarkdown.json scan --recurse --exclude '.venv/**' .
