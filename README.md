@@ -1,5 +1,10 @@
 # GitHub Actions (shared)
 
+> [!WARNING]
+> **This repository is archived and should not be adopted for new work.**
+> Migrate multi-arch publish/sign/provenance usage to
+> [`gh-workflow/multiarch-image-build-sign-provenance`](https://github.com/gh-workflow/multiarch-image-build-sign-provenance).
+
 Shared workflows and custom composite actions for aicage repositories.
 
 ## Included
